@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎼 Mood Music Generator - GAMON</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background: linear-gradient(135deg, #fff7f3 0%, #fef4f1 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { 
+            max-width: 1000px; 
+            margin: 0 auto; 
+            background: white; 
+            padding: 30px; 
+            border-radius: 16px; 
+            box-shadow: 0 8px 32px rgba(242, 92, 92, 0.1);
+        }
+        h1 { 
+            color: #f25c5c; 
+            text-align: center; 
+            margin-bottom: 10px;
+            font-size: 2rem;
+        }
+        .subtitle {
+            text-align: center;
+            color: #6b7280;
+            margin-bottom: 30px;
+            font-size: 1.1rem;
+        }
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            font-size: 0.9rem;
+        }
+        .btn-primary { background: #f25c5c; color: white; }
+        .btn-primary:hover { background: #e04d4d; transform: translateY(-1px); }
+        .btn-success { background: #10b981; color: white; }
+        .btn-success:hover { background: #059669; }
+        .btn-warning { background: #f59e0b; color: white; }
+        .btn-warning:hover { background: #d97706; }
+        .btn-info { background: #3b82f6; color: white; }
+        .btn-info:hover { background: #2563eb; }
+        .mood-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+        }
+        .mood-card {
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 20px;
+            background: #f9fafb;
+            transition: all 0.3s ease;
+        }
+        .mood-card:hover {
+            border-color: #f25c5c;
+            box-shadow: 0 4px 12px rgba(242, 92, 92, 0.1);
+        }
+        .mood-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        .mood-emoji { font-size: 1.5rem; }
+        .mood-name { font-weight: 600; color: #374151; }
+        .mood-controls {
+            display: flex;
+            gap: 8px;
+            margin-top: 15px;
+        }
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 0.8rem;
+            border-radius: 6px;
+        }
+        .progress {
+            width: 100%;
+            height: 4px;
+            background: #e5e7eb;
+            border-radius: 2px;
+            margin: 10px 0;
+            overflow: hidden;
+        }
+        .progress-bar {
+            height: 100%;
+            background: #f25c5c;
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+        .status {
+            font-size: 0.8rem;
+            color: #6b7280;
+            margin-top: 5px;
+        }
+        .stats {
+            background: #f8fafc;
+            padding: 20px;
+            border-radius: 12px;
+            margin-top: 30px;
+            text-align: center;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 20px;
+            margin-top: 15px;
+        }
+        .stat-item {
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            border: 1px solid #e5e7eb;
+        }
+        .stat-number {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #f25c5c;
+        }
+        .stat-label {
+            font-size: 0.9rem;
+            color: #6b7280;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎼 Mood Music Generator</h1>
+        <p class="subtitle">Generator melodi otomatis untuk setiap mood di GAMON</p>
+        
+        <div class="controls">
+            <button class="btn btn-primary" onclick="generateAllMusic()">🎵 Generate Semua Musik</button>
+            <button class="btn btn-success" onclick="playAllPreview()">▶️ Preview Semua</button>
+            <button class="btn btn-warning" onclick="stopAllMusic()">⏹️ Stop Semua</button>
+            <button class="btn btn-info" onclick="downloadAllMusic()">📥 Download Semua</button>
+        </div>
+
+        <div id="moodGrid" class="mood-grid"></div>
+
+        <div class="stats">
+            <h3>📊 Statistik Generator</h3>
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="stat-number" id="totalMoods">0</div>
+                    <div class="stat-label">Total Mood</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number" id="generatedCount">0</div>
+                    <div class="stat-label">Musik Generated</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number" id="totalDuration">0</div>
+                    <div class="stat-label">Total Durasi (detik)</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number" id="avgQuality">High</div>
+                    <div class="stat-label">Kualitas Audio</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Mood data with music characteristics
+        const moods = [
+            {id: 1, name: 'Bahagia', emoji: '😊', file: 'bahagia.mp3', key: 'C', tempo: 120, scale: 'major', notes: [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88]},
+            {id: 2, name: 'Senang', emoji: '😄', file: 'senang.mp3', key: 'G', tempo: 140, scale: 'major', notes: [392.00, 440.00, 493.88, 523.25, 587.33, 659.25, 739.99]},
+            {id: 3, name: 'Antusias', emoji: '🤩', file: 'antusias.mp3', key: 'D', tempo: 160, scale: 'major', notes: [293.66, 329.63, 369.99, 392.00, 440.00, 493.88, 554.37]},
+            {id: 4, name: 'Bersemangat', emoji: '✨', file: 'bersemangat.mp3', key: 'E', tempo: 150, scale: 'major', notes: [329.63, 369.99, 415.30, 440.00, 493.88, 554.37, 622.25]},
+            {id: 5, name: 'Bersyukur', emoji: '🙏', file: 'bersyukur.mp3', key: 'F', tempo: 100, scale: 'major', notes: [349.23, 392.00, 440.00, 466.16, 523.25, 587.33, 659.25]},
+            {id: 6, name: 'Cinta', emoji: '❤️', file: 'cinta.mp3', key: 'A', tempo: 80, scale: 'major', notes: [440.00, 493.88, 554.37, 587.33, 659.25, 739.99, 830.61]},
+            {id: 7, name: 'Bangga', emoji: '🏆', file: 'bangga.mp3', key: 'Bb', tempo: 130, scale: 'major', notes: [466.16, 523.25, 587.33, 622.25, 698.46, 783.99, 880.00]},
+            {id: 8, name: 'Lega', emoji: '😌', file: 'lega.mp3', key: 'C', tempo: 90, scale: 'major', notes: [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88]},
+            {id: 9, name: 'Tenang', emoji: '🧘', file: 'tenang.mp3', key: 'Am', tempo: 70, scale: 'minor', notes: [220.00, 246.94, 293.66, 329.63, 369.99, 440.00, 493.88]},
+            {id: 10, name: 'Optimis', emoji: '☀️', file: 'optimis.mp3', key: 'C', tempo: 110, scale: 'major', notes: [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88]},
+            {id: 11, name: 'Sedih', emoji: '😢', file: 'sedih.mp3', key: 'Am', tempo: 60, scale: 'minor', notes: [220.00, 246.94, 261.63, 293.66, 329.63, 369.99, 415.30]},
+            {id: 12, name: 'Kecewa', emoji: '😞', file: 'kecewa.mp3', key: 'Dm', tempo: 65, scale: 'minor', notes: [293.66, 329.63, 349.23, 392.00, 440.00, 493.88, 554.37]},
+            {id: 13, name: 'Cemas', emoji: '😰', file: 'cemas.mp3', key: 'F#m', tempo: 95, scale: 'minor', notes: [369.99, 415.30, 440.00, 493.88, 554.37, 622.25, 698.46]},
+            {id: 14, name: 'Nostalgia', emoji: '🌅', file: 'nostalgia.mp3', key: 'Em', tempo: 85, scale: 'minor', notes: [329.63, 369.99, 392.00, 440.00, 493.88, 554.37, 622.25]},
+            {id: 15, name: 'Romantis', emoji: '💕', file: 'romantic.mp3', key: 'F', tempo: 75, scale: 'major', notes: [349.23, 392.00, 440.00, 466.16, 523.25, 587.33, 659.25]}
+        ];
+
+        let audioContext;
+        let generatedBuffers = new Map();
+        let currentlyPlaying = new Set();
+        let generatedCount = 0;
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeAudioContext();
+            renderMoodGrid();
+            updateStats();
+        });
+
+        function initializeAudioContext() {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
+
+        function renderMoodGrid() {
+            const grid = document.getElementById('moodGrid');
+            grid.innerHTML = '';
+
+            moods.forEach(mood => {
+                const card = document.createElement('div');
+                card.className = 'mood-card';
+                card.innerHTML = `
+                    <div class="mood-header">
+                        <span class="mood-emoji">${mood.emoji}</span>
+                        <span class="mood-name">${mood.name}</span>
+                    </div>
+                    <div style="font-size: 0.8rem; color: #6b7280;">
+                        Key: ${mood.key} | Tempo: ${mood.tempo} BPM | ${mood.scale}
+                    </div>
+                    <div class="progress">
+                        <div class="progress-bar" id="progress-${mood.id}"></div>
+                    </div>
+                    <div class="status" id="status-${mood.id}">Siap generate</div>
+                    <div class="mood-controls">
+                        <button class="btn btn-primary btn-sm" onclick="generateMoodMusic(${mood.id})">🎵 Generate</button>
+                        <button class="btn btn-success btn-sm" onclick="playPreview(${mood.id})">▶️ Play</button>
+                        <button class="btn btn-warning btn-sm" onclick="stopPreview(${mood.id})">⏹️ Stop</button>
+                        <button class="btn btn-info btn-sm" onclick="downloadMusic(${mood.id})">📥 Save</button>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        function generateMoodMusic(moodId) {
+            const mood = moods.find(m => m.id === moodId);
+            if (!mood) return;
+
+            updateStatus(moodId, 'Generating...', 0);
+            
+            // Simulate generation progress
+            let progress = 0;
+            const interval = setInterval(() => {
+                progress += Math.random() * 20;
+                if (progress >= 100) {
+                    progress = 100;
+                    clearInterval(interval);
+                    finishGeneration(mood);
+                }
+                updateProgress(moodId, progress);
+            }, 100);
+        }
+
+        function finishGeneration(mood) {
+            // Generate actual audio buffer
+            const buffer = generateAudioBuffer(mood);
+            generatedBuffers.set(mood.id, buffer);
+            generatedCount++;
+            
+            updateStatus(mood.id, '✅ Generated!', 100);
+            updateStats();
+        }
+
+        function generateAudioBuffer(mood) {
+            const duration = 30; // 30 seconds
+            const sampleRate = audioContext.sampleRate;
+            const frameCount = sampleRate * duration;
+            const channels = 1;
+            
+            const buffer = audioContext.createBuffer(channels, frameCount, sampleRate);
+            const channelData = buffer.getChannelData(0);
+            
+            const beatDuration = 60 / mood.tempo; // seconds per beat
+            const notesPerBeat = 2;
+            const noteDuration = beatDuration / notesPerBeat;
+            
+            for (let i = 0; i < frameCount; i++) {
+                const time = i / sampleRate;
+                const beatIndex = Math.floor(time / noteDuration) % mood.notes.length;
+                const freq = mood.notes[beatIndex];
+                
+                // Generate melody with harmony
+                let sample = 0;
+                
+                // Main melody
+                sample += Math.sin(2 * Math.PI * freq * time) * 0.3;
+                
+                // Add harmony (third)
+                const harmonyFreq = mood.notes[(beatIndex + 2) % mood.notes.length];
+                sample += Math.sin(2 * Math.PI * harmonyFreq * time) * 0.2;
+                
+                // Add bass (root note, lower octave)
+                const bassFreq = mood.notes[0] / 2;
+                if (Math.floor(time / beatDuration) % 4 === 0) {
+                    sample += Math.sin(2 * Math.PI * bassFreq * time) * 0.2;
+                }
+                
+                // Apply envelope (ADSR-like)
+                const noteTime = (time % noteDuration) / noteDuration;
+                let envelope = 1;
+                if (noteTime < 0.1) envelope = noteTime / 0.1; // Attack
+                else if (noteTime > 0.8) envelope = (1 - noteTime) / 0.2; // Release
+                
+                // Apply mood-specific modulation
+                if (mood.scale === 'minor' && mood.name.includes('Sedih')) {
+                    // Add vibrato for sad moods
+                    const vibrato = 1 + 0.1 * Math.sin(2 * Math.PI * 6 * time);
+                    sample *= vibrato;
+                }
+                
+                channelData[i] = sample * envelope * 0.3; // Master volume
+            }
+            
+            return buffer;
+        }
+
+        function playPreview(moodId) {
+            const buffer = generatedBuffers.get(moodId);
+            if (!buffer) {
+                alert('Generate musik terlebih dahulu!');
+                return;
+            }
+
+            stopPreview(moodId); // Stop if already playing
+
+            const source = audioContext.createBufferSource();
+            source.buffer = buffer;
+            source.connect(audioContext.destination);
+            source.start();
+            
+            currentlyPlaying.add(moodId);
+            source.onended = () => currentlyPlaying.delete(moodId);
+            
+            updateStatus(moodId, '🔊 Playing...', 100);
+        }
+
+        function stopPreview(moodId) {
+            currentlyPlaying.delete(moodId);
+            updateStatus(moodId, generatedBuffers.has(moodId) ? '✅ Ready' : 'Siap generate', 
+                        generatedBuffers.has(moodId) ? 100 : 0);
+        }
+
+        function downloadMusic(moodId) {
+            const buffer = generatedBuffers.get(moodId);
+            const mood = moods.find(m => m.id === moodId);
+            
+            if (!buffer || !mood) {
+                alert('Generate musik terlebih dahulu!');
+                return;
+            }
+
+            const wav = audioBufferToWav(buffer);
+            const blob = new Blob([wav], { type: 'audio/wav' });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = mood.file.replace('.mp3', '.wav');
+            a.click();
+            
+            URL.revokeObjectURL(url);
+            updateStatus(moodId, '📥 Downloaded!', 100);
+        }
+
+        function generateAllMusic() {
+            moods.forEach(mood => {
+                setTimeout(() => generateMoodMusic(mood.id), mood.id * 200);
+            });
+        }
+
+        function playAllPreview() {
+            moods.forEach(mood => {
+                if (generatedBuffers.has(mood.id)) {
+                    setTimeout(() => playPreview(mood.id), mood.id * 500);
+                }
+            });
+        }
+
+        function stopAllMusic() {
+            moods.forEach(mood => stopPreview(mood.id));
+        }
+
+        function downloadAllMusic() {
+            moods.forEach(mood => {
+                if (generatedBuffers.has(mood.id)) {
+                    setTimeout(() => downloadMusic(mood.id), mood.id * 300);
+                }
+            });
+        }
+
+        function updateProgress(moodId, progress) {
+            const progressBar = document.getElementById(`progress-${moodId}`);
+            if (progressBar) progressBar.style.width = `${progress}%`;
+        }
+
+        function updateStatus(moodId, status, progress) {
+            const statusEl = document.getElementById(`status-${moodId}`);
+            if (statusEl) statusEl.textContent = status;
+            updateProgress(moodId, progress);
+        }
+
+        function updateStats() {
+            document.getElementById('totalMoods').textContent = moods.length;
+            document.getElementById('generatedCount').textContent = generatedCount;
+            document.getElementById('totalDuration').textContent = generatedCount * 30;
+        }
+
+        // Audio buffer to WAV conversion
+        function audioBufferToWav(buffer) {
+            const length = buffer.length;
+            const result = new ArrayBuffer(44 + length * 2);
+            const view = new DataView(result);
+            const channels = 1;
+            const sampleRate = buffer.sampleRate;
+
+            const writeString = (offset, string) => {
+                for (let i = 0; i < string.length; i++) {
+                    view.setUint8(offset + i, string.charCodeAt(i));
+                }
+            };
+
+            writeString(0, 'RIFF');
+            view.setUint32(4, 36 + length * 2, true);
+            writeString(8, 'WAVE');
+            writeString(12, 'fmt ');
+            view.setUint32(16, 16, true);
+            view.setUint16(20, 1, true);
+            view.setUint16(22, channels, true);
+            view.setUint32(24, sampleRate, true);
+            view.setUint32(28, sampleRate * 2, true);
+            view.setUint16(32, 2, true);
+            view.setUint16(34, 16, true);
+            writeString(36, 'data');
+            view.setUint32(40, length * 2, true);
+
+            const channelData = buffer.getChannelData(0);
+            let offset = 44;
+            for (let i = 0; i < length; i++) {
+                const sample = Math.max(-1, Math.min(1, channelData[i]));
+                view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
+                offset += 2;
+            }
+
+            return result;
+        }
+    </script>
+</body>
+</html>

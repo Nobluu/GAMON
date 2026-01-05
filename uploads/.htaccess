@@ -1,0 +1,4 @@
+Options -Indexes
+Options -ExecCGI
+RemoveHandler .php .phtml .php3 .php4 .php5
+AddType text/plain .php .phtml .php3 .php4 .php5

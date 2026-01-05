@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎵 Test Mood Music - GAMON</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background: linear-gradient(135deg, #fff7f3 0%, #fef4f1 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { 
+            max-width: 800px; 
+            margin: 0 auto; 
+            background: white; 
+            padding: 30px; 
+            border-radius: 16px; 
+            box-shadow: 0 8px 32px rgba(242, 92, 92, 0.1);
+        }
+        h1 { 
+            color: #f25c5c; 
+            text-align: center; 
+            margin-bottom: 30px;
+        }
+        .mood-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        .mood-item {
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: #f9fafb;
+        }
+        .mood-item:hover {
+            border-color: #f25c5c;
+            background: rgba(242, 92, 92, 0.05);
+        }
+        .mood-item.playing {
+            background: rgba(242, 92, 92, 0.1);
+            border-color: #f25c5c;
+        }
+        .mood-emoji { font-size: 1.2rem; }
+        .mood-name { flex: 1; font-weight: 500; color: #374151; }
+        .play-icon { color: #f25c5c; font-size: 0.9rem; }
+        .controls {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 0 5px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+        .btn-primary { background: #f25c5c; color: white; }
+        .btn-primary:hover { background: #e04d4d; }
+        .btn-secondary { background: #6b7280; color: white; }
+        .btn-secondary:hover { background: #4b5563; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎵 Test Mood Music</h1>
+        
+        <div class="controls">
+            <button class="btn btn-secondary" onclick="stopAllMusic()">⏹️ Stop All</button>
+            <span style="margin: 0 10px; color: #6b7280;">Klik mood untuk memutar musik</span>
+        </div>
+        
+        <div id="moodList" class="mood-list"></div>
+        
+        <audio id="musicPlayer" style="display: none;"></audio>
+        
+        <div style="margin-top: 30px; padding: 15px; background: #f8fafc; border-radius: 8px; text-align: center; color: #6b7280; font-size: 0.9rem;">
+            🎼 Total: <span id="moodCount">0</span> mood tersedia dengan musik melodi
+        </div>
+    </div>
+
+    <script>
+        // Sample moods data (will be populated from PHP in real app)
+        const testMoods = [
+            {id: 1, name: 'Bahagia', emoji: '😊', music_file: 'bahagia.wav'},
+            {id: 2, name: 'Senang', emoji: '😄', music_file: 'senang.wav'},
+            {id: 3, name: 'Antusias', emoji: '🤩', music_file: 'antusias.wav'},
+            {id: 4, name: 'Bersemangat', emoji: '✨', music_file: 'bersemangat.wav'},
+            {id: 5, name: 'Tenang', emoji: '🧘', music_file: 'tenang.wav'},
+            {id: 6, name: 'Sedih', emoji: '😢', music_file: 'sedih.wav'},
+            {id: 7, name: 'Romantis', emoji: '💕', music_file: 'romantic.wav'},
+            {id: 8, name: 'Nostalgia', emoji: '🌅', music_file: 'nostalgia.wav'},
+            {id: 9, name: 'Cinta', emoji: '❤️', music_file: 'cinta.wav'},
+            {id: 10, name: 'Santai', emoji: '😎', music_file: 'santai.wav'},
+            {id: 11, name: 'Bangga', emoji: '🏆', music_file: 'bangga.wav'},
+            {id: 12, name: 'Bersyukur', emoji: '🙏', music_file: 'bersyukur.wav'},
+            {id: 13, name: 'Accomplished', emoji: '✅', music_file: 'accomplished.wav'},
+            {id: 14, name: 'Adventurous', emoji: '🌍', music_file: 'adventurous.wav'},
+            {id: 15, name: 'Berdoa', emoji: '🤲', music_file: 'berdoa.wav'}
+        ];
+
+        let currentPlaying = null;
+        const musicPlayer = document.getElementById('musicPlayer');
+
+        function renderMoods() {
+            const container = document.getElementById('moodList');
+            container.innerHTML = '';
+            
+            testMoods.forEach(mood => {
+                const item = document.createElement('div');
+                item.className = 'mood-item';
+                item.onclick = () => playMood(mood);
+                item.innerHTML = `
+                    <span class="mood-emoji">${mood.emoji}</span>
+                    <span class="mood-name">${mood.name}</span>
+                    <span class="play-icon">🎵</span>
+                `;
+                container.appendChild(item);
+            });
+            
+            document.getElementById('moodCount').textContent = testMoods.length;
+        }
+
+        function playMood(mood) {
+            // Stop current music
+            if (currentPlaying) {
+                musicPlayer.pause();
+                document.querySelectorAll('.mood-item.playing').forEach(item => {
+                    item.classList.remove('playing');
+                });
+            }
+
+            // Play new music
+            musicPlayer.innerHTML = `
+                <source src="/gamon/uploads/music/moods/${mood.music_file}" type="audio/wav">
+                <source src="/gamon/uploads/music/moods/${mood.music_file.replace('.wav', '.mp3')}" type="audio/mpeg">
+            `;
+            
+            musicPlayer.load();
+            musicPlayer.volume = 0.3;
+            musicPlayer.loop = true;
+            
+            musicPlayer.play().then(() => {
+                currentPlaying = mood;
+                // Add visual feedback
+                event.target.closest('.mood-item').classList.add('playing');
+                console.log(`🎵 Playing: ${mood.name}`);
+            }).catch(e => {
+                console.log('Could not play music:', e);
+                alert(`Tidak dapat memutar musik untuk ${mood.name}. File mungkin belum ada.`);
+            });
+        }
+
+        function stopAllMusic() {
+            if (musicPlayer) {
+                musicPlayer.pause();
+                musicPlayer.currentTime = 0;
+            }
+            currentPlaying = null;
+            document.querySelectorAll('.mood-item.playing').forEach(item => {
+                item.classList.remove('playing');
+            });
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', renderMoods);
+    </script>
+</body>
+</html>

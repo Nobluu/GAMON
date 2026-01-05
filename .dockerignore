@@ -1,0 +1,24 @@
+# Ignore development files
+.DS_Store
+Thumbs.db
+
+# Ignore IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Ignore OS files
+.DS_Store
+Thumbs.db
+
+# Ignore temporary files
+temp/
+logs/
+*.log
+
+# Ignore Docker volumes
+db_data/
+
+# Ignore uploads in development (optional)
+# uploads/
