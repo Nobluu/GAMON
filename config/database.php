@@ -1,15 +1,30 @@
 <?php
 if (!class_exists('Database')) {
     class Database {
-        private $host = '127.0.0.1';
-        private $port = '3306';
-        private $db_name = 'capsule_db';
-        private $username = 'root';
-        private $password = '';
+        private $host;
+        private $port;
+        private $db_name;
+        private $username;
+        private $password;
         public $conn;
 
         public function __construct() {
-            // Constructor is now public
+            // Auto-detect environment (Docker vs XAMPP)
+            if (getenv('DB_HOST') !== false) {
+                // Docker environment
+                $this->host = getenv('DB_HOST');
+                $this->port = '3306'; // Internal Docker port
+                $this->db_name = getenv('DB_NAME') ?: 'capsule_db';
+                $this->username = getenv('DB_USER') ?: 'root';
+                $this->password = getenv('DB_PASS') ?: '';
+            } else {
+                // XAMPP local environment
+                $this->host = '127.0.0.1';
+                $this->port = '3306';
+                $this->db_name = 'capsule_db';
+                $this->username = 'root';
+                $this->password = '';
+            }
         }
 
         public function getConnection() {

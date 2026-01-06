@@ -127,7 +127,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $success_message = 'Kapsul berhasil dibuat' . $upload_info . '! Akan dibuka pada ' . date('d M Y, H:i', strtotime($unlock_date));
                 
                 // Set success notification in session
-                session_start();
                 $_SESSION['notification'] = [
                     'type' => 'success',
                     'message' => $success_message

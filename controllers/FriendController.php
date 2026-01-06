@@ -14,13 +14,23 @@ class FriendController {
      */
     public function sendFriendRequest($requester_id, $addressee_identifier) {
         try {
-            // Find user by email or friend code
-            $query = "SELECT id, name, email FROM users 
-                      WHERE email = :identifier OR friend_code = :identifier 
-                      LIMIT 1";
-            $stmt = $this->conn->prepare($query);
-            $stmt->bindParam(':identifier', $addressee_identifier);
-            $stmt->execute();
+            // Find user by email or friend code (handle if friend_code column doesn't exist)
+            $columnCheck = $this->conn->query("SHOW COLUMNS FROM users LIKE 'friend_code'");
+            $hasFriendCode = $columnCheck->rowCount() > 0;
+            
+            if ($hasFriendCode) {
+                $query = "SELECT id, name, email FROM users 
+                          WHERE email = ? OR friend_code = ? 
+                          LIMIT 1";
+                $stmt = $this->conn->prepare($query);
+                $stmt->execute([$addressee_identifier, $addressee_identifier]);
+            } else {
+                $query = "SELECT id, name, email FROM users 
+                          WHERE email = ? 
+                          LIMIT 1";
+                $stmt = $this->conn->prepare($query);
+                $stmt->execute([$addressee_identifier]);
+            }
             
             $addressee = $stmt->fetch(PDO::FETCH_ASSOC);
             
@@ -35,14 +45,27 @@ class FriendController {
                 return ['status' => false, 'message' => 'Tidak bisa menambahkan diri sendiri sebagai teman.'];
             }
 
+            // Check if friendships table exists
+            $tableCheck = $this->conn->query("SHOW TABLES LIKE 'friendships'");
+            if ($tableCheck->rowCount() == 0) {
+                // Create friendships table
+                $createSql = "CREATE TABLE friendships (
+                    id INT PRIMARY KEY AUTO_INCREMENT,
+                    requester_id INT NOT NULL,
+                    addressee_id INT NOT NULL,
+                    status ENUM('pending', 'accepted', 'declined', 'blocked') DEFAULT 'pending',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                )";
+                $this->conn->exec($createSql);
+            }
+
             // Check if friendship already exists
             $checkQuery = "SELECT id, status FROM friendships 
-                           WHERE (requester_id = :req_id AND addressee_id = :addr_id) 
-                           OR (requester_id = :addr_id AND addressee_id = :req_id)";
+                           WHERE (requester_id = ? AND addressee_id = ?) 
+                           OR (requester_id = ? AND addressee_id = ?)";
             $checkStmt = $this->conn->prepare($checkQuery);
-            $checkStmt->bindParam(':req_id', $requester_id);
-            $checkStmt->bindParam(':addr_id', $addressee_id);
-            $checkStmt->execute();
+            $checkStmt->execute([$requester_id, $addressee_id, $addressee_id, $requester_id]);
             
             $existing = $checkStmt->fetch(PDO::FETCH_ASSOC);
             
@@ -57,10 +80,9 @@ class FriendController {
                     case 'declined':
                     case 'rejected':
                         // Delete the declined friendship so user can send new request
-                        $deleteQuery = "DELETE FROM friendships WHERE id = :friendship_id";
+                        $deleteQuery = "DELETE FROM friendships WHERE id = ?";
                         $deleteStmt = $this->conn->prepare($deleteQuery);
-                        $deleteStmt->bindParam(':friendship_id', $existing['id']);
-                        $deleteStmt->execute();
+                        $deleteStmt->execute([$existing['id']]);
                         break;
                     default:
                         break;
@@ -69,16 +91,18 @@ class FriendController {
 
             // Create friend request
             $insertQuery = "INSERT INTO friendships (requester_id, addressee_id, status) 
-                            VALUES (:requester_id, :addressee_id, 'pending')";
+                            VALUES (?, ?, 'pending')";
             $insertStmt = $this->conn->prepare($insertQuery);
-            $insertStmt->bindParam(':requester_id', $requester_id);
-            $insertStmt->bindParam(':addressee_id', $addressee_id);
             
-            if ($insertStmt->execute()) {
+            if ($insertStmt->execute([$requester_id, $addressee_id])) {
                 $friendship_id = $this->conn->lastInsertId();
                 
-                // Create notification for the addressee
-                $this->createFriendNotification($addressee_id, 'friend_request', $requester_id, $friendship_id);
+                // Create notification for the addressee (if notification function exists)
+                try {
+                    $this->createFriendNotification($addressee_id, 'friend_request', $requester_id, $friendship_id);
+                } catch (Exception $e) {
+                    // Ignore notification errors for now
+                }
                 
                 return [
                     'status' => true, 
@@ -90,7 +114,7 @@ class FriendController {
             return ['status' => false, 'message' => 'Gagal mengirim permintaan pertemanan.'];
         } catch (PDOException $e) {
             error_log("Error sending friend request: " . $e->getMessage());
-            return ['status' => false, 'message' => 'Terjadi kesalahan sistem.'];
+            return ['status' => false, 'message' => 'Terjadi kesalahan sistem: ' . $e->getMessage()];
         }
     }
 
@@ -277,31 +301,48 @@ class FriendController {
         try {
             $searchTerm = "%{$query}%";
             
-            $sql = "SELECT 
-                        u.id,
-                        u.name,
-                        u.email,
-                        u.friend_code,
-                        u.profile_picture,
-                        CASE 
-                            WHEN f.id IS NOT NULL THEN f.status
-                            ELSE 'none'
-                        END as friendship_status
-                    FROM users u
-                    LEFT JOIN friendships f ON (
-                        (f.requester_id = u.id AND f.addressee_id = :user_id) OR
-                        (f.addressee_id = u.id AND f.requester_id = :user_id)
-                    )
-                    WHERE u.id != :user_id 
-                    AND (u.name LIKE :search OR u.email LIKE :search OR u.friend_code LIKE :search)
-                    ORDER BY u.name ASC
-                    LIMIT :limit";
+            // Check if friend_code column exists first
+            $columnExists = false;
+            try {
+                $checkCol = $this->conn->query("SHOW COLUMNS FROM users LIKE 'friend_code'");
+                $columnExists = $checkCol->rowCount() > 0;
+            } catch (Exception $e) {
+                $columnExists = false;
+            }
             
-            $stmt = $this->conn->prepare($sql);
-            $stmt->bindParam(':user_id', $user_id);
-            $stmt->bindParam(':search', $searchTerm);
-            $stmt->bindValue(':limit', (int)$limit, PDO::PARAM_INT);
-            $stmt->execute();
+            if ($columnExists) {
+                $sql = "SELECT 
+                            u.id,
+                            u.name,
+                            u.email,
+                            u.friend_code,
+                            u.profile_picture,
+                            'none' as friendship_status
+                        FROM users u
+                        WHERE u.id != ? 
+                        AND (u.name LIKE ? OR u.email LIKE ? OR u.friend_code LIKE ?)
+                        ORDER BY u.name ASC
+                        LIMIT ?";
+                        
+                $stmt = $this->conn->prepare($sql);
+                $stmt->execute([(int)$user_id, $searchTerm, $searchTerm, $searchTerm, (int)$limit]);
+            } else {
+                $sql = "SELECT 
+                            u.id,
+                            u.name,
+                            u.email,
+                            '' as friend_code,
+                            u.profile_picture,
+                            'none' as friendship_status
+                        FROM users u
+                        WHERE u.id != ? 
+                        AND (u.name LIKE ? OR u.email LIKE ?)
+                        ORDER BY u.name ASC
+                        LIMIT ?";
+                        
+                $stmt = $this->conn->prepare($sql);
+                $stmt->execute([(int)$user_id, $searchTerm, $searchTerm, (int)$limit]);
+            }
             
             $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -311,7 +352,7 @@ class FriendController {
             ];
         } catch (PDOException $e) {
             error_log("Error searching users: " . $e->getMessage());
-            return ['status' => false, 'message' => 'Gagal mencari pengguna.'];
+            return ['status' => false, 'message' => 'Gagal mencari pengguna: ' . $e->getMessage()];
         }
     }
 
@@ -421,15 +462,61 @@ class FriendController {
      */
     public function getUserFriendCode($user_id) {
         try {
-            $query = "SELECT friend_code FROM users WHERE id = :user_id";
+            // First check if friend_code column exists
+            $columnCheck = $this->conn->query("SHOW COLUMNS FROM users LIKE 'friend_code'");
+            if ($columnCheck->rowCount() == 0) {
+                return null; // Column doesn't exist
+            }
+            
+            $query = "SELECT friend_code FROM users WHERE id = ?";
             $stmt = $this->conn->prepare($query);
-            $stmt->bindParam(':user_id', $user_id);
-            $stmt->execute();
+            $stmt->execute([(int)$user_id]);
             
             $result = $stmt->fetch(PDO::FETCH_ASSOC);
-            return $result ? $result['friend_code'] : null;
+            $friendCode = $result ? $result['friend_code'] : null;
+            
+            // If user doesn't have friend code, generate one
+            if (empty($friendCode)) {
+                $friendCode = $this->generateFriendCode($user_id);
+            }
+            
+            return $friendCode;
         } catch (PDOException $e) {
             error_log("Error getting friend code: " . $e->getMessage());
+            return null;
+        }
+    }
+    
+    /**
+     * Generate unique friend code for user
+     */
+    private function generateFriendCode($user_id) {
+        try {
+            $attempts = 0;
+            do {
+                $friendCode = strtoupper(substr(uniqid(), -6));
+                
+                // Check if code already exists
+                $checkStmt = $this->conn->prepare("SELECT id FROM users WHERE friend_code = ?");
+                $checkStmt->execute([$friendCode]);
+                $exists = $checkStmt->rowCount() > 0;
+                
+                $attempts++;
+                if ($attempts > 10) {
+                    $friendCode = strtoupper(substr(uniqid() . rand(10,99), -8));
+                    break;
+                }
+            } while ($exists);
+            
+            // Update user with new friend code
+            $updateStmt = $this->conn->prepare("UPDATE users SET friend_code = ? WHERE id = ?");
+            if ($updateStmt->execute([$friendCode, $user_id])) {
+                return $friendCode;
+            }
+            
+            return null;
+        } catch (PDOException $e) {
+            error_log("Error generating friend code: " . $e->getMessage());
             return null;
         }
     }
