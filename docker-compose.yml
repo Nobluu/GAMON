@@ -37,8 +37,25 @@ services:
       - gamon-network
     restart: unless-stopped
 
+  nagios:
+    image: manios/nagios
+    container_name: gamon-nagios
+    ports:
+      - "8080:80"
+    volumes:
+      - nagios_config:/opt/nagios/etc
+      - nagios_var:/opt/nagios/var
+    networks:
+      - gamon-network
+    restart: unless-stopped
+    depends_on:
+      - web
+      - db
+
 volumes:
   db_data:
+  nagios_config:
+  nagios_var:
 
 networks:
   gamon-network:
